@@ -16,7 +16,7 @@ Construir um ambiente SOC doméstico funcional para detecção de ameaças em te
 > 📷 _Diagrama será adicionado em breve_
 
 ```
-┌─────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────┐
 │              Rede Interna VirtualBox             │
 │              10.200.200.0/24                     │
 │                                                  │
@@ -35,7 +35,7 @@ Construir um ambiente SOC doméstico funcional para detecção de ameaças em te
 │                          │  Elasticsearch    │   │
 │                          │  Kibana           │   │
 │                          └───────────────────┘   │
-└─────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────┘
 ```
 
 ---
