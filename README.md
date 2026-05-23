@@ -219,10 +219,6 @@ Invoke-AtomicTest T1218.011
 ```
 home-siem-lab/
 ├── README.md
-├── SETUP.md                        # Tutorial completo de instalação
-├── configs/
-│   ├── winlogbeat.yml              # Configuração do Winlogbeat
-│   └── kibana.yml                  # Configuração do Kibana
 ├── rules/
 │   └── rules_export.ndjson         # 8 detection rules exportadas do Kibana
 ├── incident-reports/
@@ -243,18 +239,6 @@ home-siem-lab/
     ├── 07-alerts-dashboard.png
     └── 08-kibana-dashboard.png
 ```
-
----
-
-## 🚀 Como Reproduzir
-
-Consulte o [**SETUP.md**](SETUP.md) para o guia completo de instalação passo a passo, incluindo:
-- Configuração das VMs no VirtualBox
-- Instalação do Elastic Stack
-- Configuração do Sysmon e Winlogbeat
-- Criação de todas as detection rules
-- Como simular cada ataque
-- Solução de problemas comuns
 
 ---
 
