@@ -4,16 +4,18 @@
 ![Status](https://img.shields.io/badge/Status-Ativo-green)
 ![MITRE](https://img.shields.io/badge/MITRE-ATT%26CK-red)
 ![Blue Team](https://img.shields.io/badge/Blue%20Team-SOC-informational)
+![Rules](https://img.shields.io/badge/Detection%20Rules-8-orange)
+![IRs](https://img.shields.io/badge/Incident%20Reports-7-purple)
 
 ## 📌 Objetivo
 
-Construir um ambiente SOC doméstico funcional para detecção de ameaças em tempo real, simulando ataques reais e desenvolvendo habilidades de Blue Team. O projeto cobre desde a infraestrutura até a criação de regras de detecção mapeadas ao framework MITRE ATT&CK.
+Construir um ambiente SOC doméstico funcional para detecção de ameaças em tempo real, simulando ataques reais e desenvolvendo habilidades de Blue Team. O projeto cobre desde a infraestrutura até a criação de regras de detecção mapeadas ao framework MITRE ATT&CK, com relatórios de incidente formais baseados em dados reais do SIEM.
 
 ---
 
 ## 🏗️ Arquitetura
 
-> 📷 _Diagrama será adicionado em breve_
+![Arquitetura](screenshots/01-elk-running.png)
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -45,9 +47,9 @@ Construir um ambiente SOC doméstico funcional para detecção de ameaças em te
 | Ferramenta | Versão | Função |
 |---|---|---|
 | Elasticsearch | 8.x | Armazenamento e indexação de logs |
-| Kibana | 8.x | Visualização, dashboards e alertas |
-| Winlogbeat | 9.x | Coleta de logs do Windows |
-| Sysmon | Latest | Telemetria avançada do Windows |
+| Kibana | 8.19.15 | Visualização, dashboards e alertas |
+| Winlogbeat | 9.4.1 | Coleta de logs do Windows |
+| Sysmon | Latest | Telemetria avançada do Windows (354 campos) |
 | Atomic Red Team | Latest | Simulação de ataques MITRE ATT&CK |
 | Hydra | 9.x | Simulação de brute force |
 | Nmap | Latest | Simulação de reconhecimento de rede |
@@ -58,38 +60,52 @@ Construir um ambiente SOC doméstico funcional para detecção de ameaças em te
 
 ## 🎯 Detection Rules Criadas
 
-| # | Regra | Técnica MITRE | Severidade | Evento |
-|---|---|---|---|---|
-| 1 | Brute Force - Failed Logon Detection | T1110 | 🟡 Medium | Event ID 4625 |
-| 2 | Reverse Shell - Suspicious Outbound Connection | T1059 | 🔴 High | Sysmon ID 3, porta 4444 |
-| 3 | Nmap Scan - Network Reconnaissance | T1046 | 🟡 Medium | Sysmon ID 3, source Kali |
-| 4 | Mimikatz - Credential Dumping | T1003 | 🔴 Critical | Sysmon ID 1, mimikatz.exe |
-| 5 | Suspicious Rundll32 Execution | T1218.011 | 🟡 Medium | Sysmon ID 1, rundll32.exe |
-| 6 | System Owner Discovery - Whoami | T1033 | 🟢 Low | Sysmon ID 1, whoami.exe |
-| 7 | Account Discovery - Net.exe | T1087 | 🟡 Medium | Sysmon ID 1, net.exe |
+| # | Regra | Tática MITRE | Técnica | Severidade | Evento |
+|---|---|---|---|---|---|
+| 1 | Brute Force - Failed Logon Detection | Credential Access | T1110.001 | 🟡 Medium | Event ID 4625 + LogonType 3 |
+| 2 | Reverse Shell - Suspicious Outbound Connection | Command & Control | T1071 | 🔴 High | Sysmon ID 3, porta 4444 |
+| 3 | Nmap Scan - Network Reconnaissance | Discovery | T1046 | 🟡 Medium | Sysmon ID 3, source IP |
+| 4 | Mimikatz - Credential Dumping | Credential Access | T1003.001 | 🔴 Critical | Sysmon ID 1, mimikatz.exe |
+| 5 | Suspicious Rundll32 Execution | Defense Evasion | T1218.011 | 🟡 Medium | Sysmon ID 1, rundll32.exe |
+| 6 | System Owner Discovery - Whoami | Discovery | T1033 | 🟢 Low | Sysmon ID 1, whoami.exe |
+| 7 | Account Discovery - Net.exe | Discovery | T1087.001 | 🟡 Medium | Sysmon ID 1, net.exe |
+| 8 | Suspicious PowerShell Encoded Command | Defense Evasion | T1027 | 🔴 High | Sysmon ID 1, -EncodedCommand |
+
+> 📥 Todas as regras estão disponíveis para importação em [`rules/rules_export.ndjson`](rules/rules_export.ndjson)
 
 ---
 
 ## ⚔️ Ataques Simulados
 
-### 1. Brute Force RDP — T1110
+### 1. Brute Force RDP — T1110.001
 
-**Ferramenta:** Hydra  
-**Origem:** Kali Linux  
-**Detecção:** Event ID 4625 — múltiplos logins falhados
+**Ferramenta:** Hydra | **Origem:** Kali Linux | **IR:** [IR-007](incident-reports/IR-007-brute-force.md)
 
 ```bash
-hydra -l Administrator -P /usr/share/wordlists/rockyou.txt rdp://10.200.200.20
+hydra -l Administrator -P /usr/share/wordlists/rockyou.txt rdp://10.200.200.20 -V -t 1
 ```
 
+**Resultado:** 28 tentativas detectadas em ~2 minutos | Threshold de 10 atingido
+
+![Hydra Attack](screenshots/04-hydra-attack.png)
 
 ---
 
-### 2. Reverse Shell — T1059
+### 2. Reconhecimento de Rede — T1046
 
-**Ferramenta:** Netcat + PowerShell  
-**Origem:** Kali Linux  
-**Detecção:** Sysmon Event ID 3 — conexão de saída na porta 4444
+**Ferramenta:** Nmap | **Origem:** Kali Linux | **IR:** [IR-005](incident-reports/IR-005-nmap.md)
+
+```bash
+nmap -sS -A 10.200.200.20
+```
+
+**Resultado:** 14 conexões detectadas em janela de 6 minutos
+
+---
+
+### 3. Reverse Shell — T1059 / T1071
+
+**Ferramenta:** Netcat + PowerShell | **Origem:** Kali Linux | **IR:** [IR-004](incident-reports/IR-004-reverse-shell.md)
 
 ```bash
 # Kali - Listener
@@ -101,59 +117,50 @@ nc -lvnp 4444
 powershell -ExecutionPolicy Bypass -File C:\shell.ps1
 ```
 
-> 📷 _Screenshot do ataque será adicionado em breve_
+![Reverse Shell](screenshots/05-reverse-shell.png)
 
 ---
 
-### 3. Reconhecimento de Rede — T1046
+### 4. Dump de Credenciais — T1003.001
 
-**Ferramenta:** Nmap  
-**Origem:** Kali Linux  
-**Detecção:** Sysmon Event ID 3 — múltiplas conexões do IP do Kali
-
-```bash
-nmap -sS -A 10.200.200.20
-```
-
-> 📷 _Screenshot do ataque será adicionado em breve_
-
----
-
-### 4. Dump de Credenciais — T1003
-
-**Ferramenta:** Mimikatz  
-**Origem:** Windows (local)  
-**Detecção:** Sysmon Event ID 1 — execução do mimikatz.exe
+**Ferramenta:** Mimikatz via Reverse Shell | **IR:** [IR-006](incident-reports/IR-006-mimikatz.md)
 
 ```
 privilege::debug
 sekurlsa::logonpasswords
 ```
 
-> 📷 _Screenshot do ataque será adicionado em breve_
+**Resultado:** Alerta Critical disparado em **54 segundos** | Risk Score: 99
+
+![Mimikatz](screenshots/06-mimikatz.png)
 
 ---
 
-### 5. Simulações com Atomic Red Team — T1033, T1087, T1218
+### 5. Simulações com Atomic Red Team
 
-**Ferramenta:** Atomic Red Team  
-**Origem:** Windows (local)  
-**Detecção:** Sysmon Event ID 1 — processos suspeitos
+**Ferramenta:** Atomic Red Team | **Origem:** Windows
+
+| Técnica | Descrição | IR |
+|---|---|---|
+| T1033 | System Owner Discovery (whoami) | [IR-002](incident-reports/IR-002-whoami.md) |
+| T1087.001 | Account Discovery (net.exe) | [IR-003](incident-reports/IR-003-net-exe.md) |
+| T1218.011 | Signed Binary Proxy Execution (rundll32) | [IR-001](incident-reports/IR-001-rundll32.md) |
 
 ```powershell
-Invoke-AtomicTest T1033    # System Owner Discovery
-Invoke-AtomicTest T1087    # Account Discovery
-Invoke-AtomicTest T1218.011 # Signed Binary Proxy Execution
-Invoke-AtomicTest T1059.001 # PowerShell
+Invoke-AtomicTest T1033
+Invoke-AtomicTest T1087
+Invoke-AtomicTest T1218.011
 ```
 
-> 📷 _Screenshot do ataque será adicionado em breve_
+**Resultado:** 43+ alertas gerados em uma única sessão
 
 ---
 
 ## 📊 Dashboards Kibana
 
-> 📷 _Screenshots dos dashboards serão adicionados em breve_
+![Alerts Dashboard](screenshots/07-alerts-dashboard.png)
+
+![Kibana Dashboard](screenshots/08-kibana-dashboard.png)
 
 ### Visualizações criadas:
 - **Alertas por Severidade** — Gráfico de pizza (Critical / High / Medium / Low)
@@ -167,25 +174,43 @@ Invoke-AtomicTest T1059.001 # PowerShell
 
 | Métrica | Resultado |
 |---|---|
-| Detection Rules criadas | 7 |
+| Detection Rules criadas | 8 |
+| Incident Reports formais | 7 |
 | Alertas gerados em simulações | 43+ |
-| Técnicas MITRE cobertas | 7 |
+| Técnicas MITRE cobertas | 8 |
 | Fontes de log | Windows Event Log + Sysmon |
 | Campos indexados | 354 |
+| Tempo médio de detecção | < 2 minutos |
+| Detecção mais rápida | 54 segundos (Mimikatz) |
 
 ---
 
 ## 🗂️ Mapeamento MITRE ATT&CK
 
-| Tática | Técnica | ID | Regra de Detecção |
-|---|---|---|---|
-| Credential Access | Brute Force | T1110 | Brute Force - Failed Logon |
-| Execution | Command & Scripting | T1059 | Reverse Shell Detection |
-| Discovery | Network Service Scan | T1046 | Nmap Scan Detection |
-| Credential Access | OS Credential Dumping | T1003 | Mimikatz Execution |
-| Defense Evasion | Signed Binary Proxy | T1218.011 | Suspicious Rundll32 |
-| Discovery | System Owner/User | T1033 | Whoami Execution |
-| Discovery | Account Discovery | T1087 | Net.exe Discovery |
+| Tática | ID Tática | Técnica | ID | Sub-técnica | Regra |
+|---|---|---|---|---|---|
+| Credential Access | TA0006 | Brute Force | T1110 | Password Guessing (T1110.001) | Brute Force - Failed Logon |
+| Command & Control | TA0011 | Application Layer Protocol | T1071 | — | Reverse Shell Detection |
+| Discovery | TA0007 | Network Service Discovery | T1046 | — | Nmap Scan Detection |
+| Credential Access | TA0006 | OS Credential Dumping | T1003 | LSASS Memory (T1003.001) | Mimikatz Execution |
+| Defense Evasion | TA0005 | System Binary Proxy Execution | T1218 | Rundll32 (T1218.011) | Suspicious Rundll32 |
+| Discovery | TA0007 | System Owner/User Discovery | T1033 | — | Whoami Execution |
+| Discovery | TA0007 | Account Discovery | T1087 | Local Account (T1087.001) | Net.exe Discovery |
+| Defense Evasion | TA0005 | Obfuscated Files or Information | T1027 | — | PowerShell Encoded Command |
+
+---
+
+## 📝 Incident Reports
+
+| ID | Título | Tática | Severidade | Data | IR |
+|---|---|---|---|---|---|
+| IR-001 | Execução Suspeita de Rundll32.exe | Defense Evasion | 🟡 Medium | 2026-05-23 | [Ver](incident-reports/IR-001-rundll32.md) |
+| IR-002 | System Owner Discovery via Whoami | Discovery | 🟢 Low | 2026-05-23 | [Ver](incident-reports/IR-002-whoami.md) |
+| IR-003 | Account Discovery via Net.exe | Discovery | 🟡 Medium | 2026-05-23 | [Ver](incident-reports/IR-003-net-exe.md) |
+| IR-004 | Reverse Shell — Porta 4444 | Command & Control | 🔴 High | 2026-05-22 | [Ver](incident-reports/IR-004-reverse-shell.md) |
+| IR-005 | Nmap Scan — Port Scan | Discovery | 🟡 Medium | 2026-05-22 | [Ver](incident-reports/IR-005-nmap.md) |
+| IR-006 | Mimikatz — Credential Dumping | Credential Access | 🔴 Critical | 2026-05-23 | [Ver](incident-reports/IR-006-mimikatz.md) |
+| IR-007 | Brute Force RDP | Credential Access | 🟡 Medium | 2026-05-23 | [Ver](incident-reports/IR-007-brute-force.md) |
 
 ---
 
@@ -194,19 +219,20 @@ Invoke-AtomicTest T1059.001 # PowerShell
 ```
 home-siem-lab/
 ├── README.md
+├── SETUP.md                        # Tutorial completo de instalação
 ├── configs/
-│   ├── winlogbeat.yml          # Configuração do Winlogbeat
-│   └── kibana.yml              # Configuração do Kibana
+│   ├── winlogbeat.yml              # Configuração do Winlogbeat
+│   └── kibana.yml                  # Configuração do Kibana
 ├── rules/
-│   ├── brute-force.json        # Detection rule exportada
-│   ├── reverse-shell.json
-│   ├── nmap-scan.json
-│   ├── mimikatz.json
-│   ├── rundll32.json
-│   ├── whoami.json
-│   └── net-discovery.json
+│   └── rules_export.ndjson         # 8 detection rules exportadas do Kibana
 ├── incident-reports/
-│   └── IR-001-brute-force.md   # Relatório de incidente formal
+│   ├── IR-001-rundll32.md
+│   ├── IR-002-whoami.md
+│   ├── IR-003-net-exe.md
+│   ├── IR-004-reverse-shell.md
+│   ├── IR-005-nmap.md
+│   ├── IR-006-mimikatz.md
+│   └── IR-007-brute-force.md
 └── screenshots/
     ├── 01-elk-running.png
     ├── 02-kibana-discover.png
@@ -222,65 +248,23 @@ home-siem-lab/
 
 ## 🚀 Como Reproduzir
 
-### Pré-requisitos
-- VirtualBox instalado
-- 16GB RAM no host
-- ISOs: Ubuntu Server 22.04, Windows 10, Kali Linux
-
-### Passo a passo
-
-**1. Configurar as VMs**
-```
-Ubuntu Server → 3GB RAM → Rede Interna + NAT
-Windows 10   → 2GB RAM → Rede Interna + NAT
-Kali Linux   → 1.5GB RAM → Rede Interna + NAT
-```
-
-**2. Instalar Elastic Stack (Ubuntu Server)**
-```bash
-# Adicionar repositório
-curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elastic.gpg
-echo "deb [signed-by=/usr/share/keyrings/elastic.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-8.x.list
-sudo apt update
-
-# Instalar
-sudo apt install elasticsearch kibana -y
-sudo systemctl enable --now elasticsearch kibana
-```
-
-**3. Instalar Sysmon (Windows)**
-- Baixar Sysmon em: https://learn.microsoft.com/sysinternals/downloads/sysmon
-- Baixar config SwiftOnSecurity
-```powershell
-.\Sysmon64.exe -accepteula -i C:\sysmonconfig.xml
-```
-
-**4. Instalar Winlogbeat (Windows)**
-- Baixar em: https://www.elastic.co/downloads/beats/winlogbeat
-- Configurar `winlogbeat.yml` com o IP do ELK
-- Instalar e iniciar o serviço
-
-**5. Simular ataques e monitorar alertas**
-- Acessar Kibana: `http://IP_ELK:5601`
-- Importar detection rules
-- Executar simulações
-
----
-
-## 📝 Incident Reports
-
-| ID | Incidente | Data | Status |
-|---|---|---|---|
-| IR-001 | Brute Force RDP | 2026-05-21 | ✅ Documentado |
+Consulte o [**SETUP.md**](SETUP.md) para o guia completo de instalação passo a passo, incluindo:
+- Configuração das VMs no VirtualBox
+- Instalação do Elastic Stack
+- Configuração do Sysmon e Winlogbeat
+- Criação de todas as detection rules
+- Como simular cada ataque
+- Solução de problemas comuns
 
 ---
 
 ## 👤 Autor
 
 **Henri Lopes**  
-Cybersecurity — Blue Team | SOC Analyst  
+Cybersecurity — Blue Team | SOC Analyst
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Conectar-blue?logo=linkedin)](https://www.linkedin.com/in/henri-de-oliveira-lopes/)
+[![GitHub](https://img.shields.io/badge/GitHub-Perfil-black?logo=github)](https://github.com/henrilopes1)
 
 ---
 
