@@ -82,7 +82,6 @@ Construir um ambiente SOC doméstico funcional para detecção de ameaças em te
 hydra -l Administrator -P /usr/share/wordlists/rockyou.txt rdp://10.200.200.20
 ```
 
-> 📷 _Screenshot do ataque será adicionado em breve_
 
 ---
 
